@@ -1,107 +1,76 @@
 import os
 import sys
 import urllib.request
-from prompt_toolkit import Application
-from prompt_toolkit.layout import Layout, HSplit, Window, FormattedTextControl
-from prompt_toolkit.widgets import Frame, Label, Button, Box
-from prompt_toolkit.key_binding import KeyBindings
-from prompt_toolkit.styles import Style
-from prompt_toolkit.layout.dimension import Dimension
 
-# Стили в духе Windows 98 (серый фон, синий заголовок)
-win98_style = Style.from_dict({
-    'frame.border': '#808080 bg:#c0c0c0',
-    'frame.label': 'bg:#000080 #ffffff bold',
-    'text': 'bg:#c0c0c0 #000000',
-    'button': 'bg:#c0c0c0 #000000',
-    'button.focused': 'bg:#000080 #ffffff',
-})
-
+# Простой и понятный установщик без сложного TUI
 REPO_URL = "https://raw.githubusercontent.com/mell-real/kefirchat/main/"
+INSTALL_DIR = os.path.expanduser("~/.local/share/kefirchat")
+BIN_DIR = os.path.expanduser("~/.local/bin")
 
-class InstallerApp:
-    def __init__(self):
-        self.install_dir = os.path.expanduser("~/.local/share/kefirchat")
-        self.status = "Готов к установке"
-        self.is_done = False
+def print_banner():
+    print("=" * 50)
+    print("       KefirChat Installation Wizard")
+    print("=" * 50)
 
-        # Текст лога
-        self.log_text = "KefirChat Setup\n\nНажмите 'Установить', чтобы начать.\n"
+def install():
+    print_banner()
+    
+    # Выбор языка
+    lang = input("Choose language (en/ru) / Выберите язык (en/ru) [en]: ").strip().lower()
+    if lang not in ["en", "ru"]:
+        lang = "en"
+    
+    # Выбор папки
+    default_dir = INSTALL_DIR
+    user_dir = input(f"Install directory / Папка установки [Enter для {default_dir}]: ").strip()
+    install_dir = user_dir if user_dir else default_dir
+    
+    os.makedirs(install_dir, exist_ok=True)
+    print(f"\n[*] Downloading files to {install_dir}...")
 
-        # Кнопки
-        self.btn_install = Button("Установить", handler=self.start_install)
-        self.btn_exit = Button("Выход", handler=self.exit_app)
-
-        # Основной контейнер
-        self.container = HSplit([
-            Frame(
-                body=Window(content=FormattedTextControl(text=lambda: self.log_text), wrap_lines=True),
-                title="KefirChat Setup",
-                style='class:frame'
-            ),
-            Window(height=1), # Отступ
-            HSplit([
-                self.btn_install,
-                self.btn_exit,
-            ])
-        ])
-
-        self.layout = Layout(self.container, focused_element=self.btn_install)
-
-    def start_install(self):
-        self.log_text += "\n[*] Установка...\n"
+    files = ["client.py", "server.py"]
+    for f in files:
+        url = REPO_URL + f
+        dest = os.path.join(install_dir, f)
         try:
-            os.makedirs(self.install_dir, exist_ok=True)
-            files = ["client.py", "server.py"]
-            for f in files:
-                url = REPO_URL + f
-                dest = os.path.join(self.install_dir, f)
-                urllib.request.urlretrieve(url, dest)
-                self.log_text += f"[+] Скачан {f}\n"
-
-            # Создание команд
-            bin_dir = os.path.expanduser("~/.local/bin")
-            os.makedirs(bin_dir, exist_ok=True)
-            
-            # 1. Клиент (kefirchat-cli)
-            launcher_cli = os.path.join(bin_dir, "kefirchat-cli")
-            with open(launcher_cli, "w") as f:
-                f.write(f"#!/bin/bash\npython3 {self.install_dir}/client.py \"$@\"\n")
-            os.chmod(launcher_cli, 0o755)
-            self.log_text += "[+] Создана команда: kefirchat-cli\n"
-
-            # 2. Сервер (kefirchat-server)
-            launcher_server = os.path.join(bin_dir, "kefirchat-server")
-            with open(launcher_server, "w") as f:
-                f.write(f"#!/bin/bash\npython3 {self.install_dir}/server.py \"$@\"\n")
-            os.chmod(launcher_server, 0o755)
-            self.log_text += "[+] Создана команда: kefirchat-server\n"
-
-            # Ярлык в меню (для клиента)
-            desktop_dir = os.path.expanduser("~/.local/share/applications")
-            os.makedirs(desktop_dir, exist_ok=True)
-            desktop_file = os.path.join(desktop_dir, "kefirchat.desktop")
-            with open(desktop_file, "w") as f:
-                f.write("[Desktop Entry]\nType=Application\nName=KefirChat\nExec=kefirchat-cli\nTerminal=true\nIcon=utilities-terminal\nCategories=Network;Chat;\n")
-            self.log_text += "[+] Создан ярлык\n"
-
-            self.log_text += "\n[+] УСТАНОВКА ЗАВЕРШЕНА!\n"
-            self.status = "Готово"
+            print(f"[*] Downloading {f}...")
+            urllib.request.urlretrieve(url, dest)
         except Exception as e:
-            self.log_text += f"\n[!] Ошибка: {e}\n"
+            print(f"[!] Error downloading {f}: {e}")
+            sys.exit(1)
 
-    def exit_app(self):
-        self.app.exit()
+    # Создание команд
+    print("[*] Creating commands...")
+    os.makedirs(BIN_DIR, exist_ok=True)
+    
+    # Клиент
+    launcher_cli = os.path.join(BIN_DIR, "kefirchat-cli")
+    with open(launcher_cli, "w") as f:
+        f.write(f"#!/bin/bash\npython3 {install_dir}/client.py \"$@\"\n")
+    os.chmod(launcher_cli, 0o755)
+    
+    # Сервер
+    launcher_server = os.path.join(BIN_DIR, "kefirchat-server")
+    with open(launcher_server, "w") as f:
+        f.write(f"#!/bin/bash\npython3 {install_dir}/server.py \"$@\"\n")
+    os.chmod(launcher_server, 0o755)
 
-    async def run(self):
-        self.app = Application(
-            layout=self.layout,
-            style=win98_style,
-            full_screen=True,
-        )
-        await self.app.run_async()
+    # Ярлык в меню
+    desktop_dir = os.path.expanduser("~/.local/share/applications")
+    os.makedirs(desktop_dir, exist_ok=True)
+    desktop_file = os.path.join(desktop_dir, "kefirchat.desktop")
+    with open(desktop_file, "w") as f:
+        f.write("[Desktop Entry]\nType=Application\nName=KefirChat\nExec=kefirchat-cli\nTerminal=true\nIcon=utilities-terminal\nCategories=Network;Chat;\n")
+
+    print("\n" + "=" * 50)
+    print("[+] Installation complete! / Установка завершена!")
+    print(f"Run client:  kefirchat-cli")
+    print(f"Run server:  kefirchat-server")
+    print("=" * 50)
 
 if __name__ == "__main__":
-    app = InstallerApp()
-    import asyncio
-    asyncio.run(app.run())
+    try:
+        install()
+    except KeyboardInterrupt:
+        print("\n[!] Installation cancelled by user.")
+        sys.exit(1)
