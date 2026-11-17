@@ -59,16 +59,25 @@ class InstallerApp:
                 urllib.request.urlretrieve(url, dest)
                 self.log_text += f"[+] Скачан {f}\n"
 
-            # Создание команды
+            # Создание команд
             bin_dir = os.path.expanduser("~/.local/bin")
             os.makedirs(bin_dir, exist_ok=True)
-            launcher = os.path.join(bin_dir, "kefirchat-cli")
-            with open(launcher, "w") as f:
+            
+            # 1. Клиент (kefirchat-cli)
+            launcher_cli = os.path.join(bin_dir, "kefirchat-cli")
+            with open(launcher_cli, "w") as f:
                 f.write(f"#!/bin/bash\npython3 {self.install_dir}/client.py \"$@\"\n")
-            os.chmod(launcher, 0o755)
+            os.chmod(launcher_cli, 0o755)
             self.log_text += "[+] Создана команда: kefirchat-cli\n"
 
-            # Ярлык
+            # 2. Сервер (kefirchat-server)
+            launcher_server = os.path.join(bin_dir, "kefirchat-server")
+            with open(launcher_server, "w") as f:
+                f.write(f"#!/bin/bash\npython3 {self.install_dir}/server.py \"$@\"\n")
+            os.chmod(launcher_server, 0o755)
+            self.log_text += "[+] Создана команда: kefirchat-server\n"
+
+            # Ярлык в меню (для клиента)
             desktop_dir = os.path.expanduser("~/.local/share/applications")
             os.makedirs(desktop_dir, exist_ok=True)
             desktop_file = os.path.join(desktop_dir, "kefirchat.desktop")
